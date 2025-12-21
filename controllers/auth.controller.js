@@ -7,9 +7,9 @@ import { sendTokens } from "../utils/sendTokens.js";
 // SIGNUP
 export const signup = async (req, res, next) => {
   try {
-    const { name, mobileNumber, password } = req.body;
+    const { username, mobileNumber, password } = req.body;
 
-    if (!name || !mobileNumber || !password) {
+    if (!username || !mobileNumber || !password) {
       return next(new AppError("Missing fields", 400));
     }
 
@@ -19,7 +19,7 @@ export const signup = async (req, res, next) => {
     }
 
     const user = await User.create({
-      name,
+      username,
       mobileNumber,
       password,
     });
@@ -34,7 +34,7 @@ export const signup = async (req, res, next) => {
       data: {
         user: {
           id: user._id,
-          name: user.name,
+          username: user.username,
           role: user.role,
         },
       },
@@ -76,7 +76,7 @@ export const login = async (req, res, next) => {
       data: {
         user: {
           id: user._id,
-          name: user.name,
+          username: user.username,
           role: user.role,
         },
       },

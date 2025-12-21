@@ -10,7 +10,7 @@ import { protect, restrictTo } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/signup", signup);
+router.post("/register", signup);
 router.post("/login", login);
 router.post("/forgotPassword", forgotPassword);
 router.patch("/resetPassword/:token", resetPassword);
