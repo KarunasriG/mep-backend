@@ -22,4 +22,5 @@ router.get("/admin", protect, restrictTo("admin"), (req, res) =>
   res.send("Admin route")
 );
 
+router.get("/user", verifyUser);
 export default router;

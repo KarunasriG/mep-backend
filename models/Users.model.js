@@ -78,7 +78,7 @@ userSchema.methods.signAccessToken = function () {
       role: this.role,
       tv: this.tokenVersion,
     },
-    process.env.JWT_ACCESS_SECRET,
+    process.env.JWT_ACCESS_TOKEN,
     { expiresIn: "15m" }
   );
 };
@@ -89,7 +89,7 @@ userSchema.methods.signRefreshToken = function () {
       id: this._id,
       tv: this.tokenVersion,
     },
-    process.env.JWT_REFRESH_SECRET,
+    process.env.JWT_REFRESH_TOKEN,
     { expiresIn: "7d" }
   );
 };

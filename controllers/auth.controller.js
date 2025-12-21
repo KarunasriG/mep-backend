@@ -2,7 +2,12 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/Users.model.js";
 import AppError from "../utils/AppError.js";
-import { sendTokens } from "../utils/sendTokens.js";
+import {
+  sendTokens,
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "../utils/sendTokens.js";
 
 // SIGNUP
 export const signup = async (req, res, next) => {
@@ -96,7 +101,7 @@ export const refreshAccessToken = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN);
     } catch {
       return next(new AppError("Invalid refresh token", 401));
     }
@@ -191,6 +196,34 @@ export const resetPassword = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+// verify me
+
+export const verifyUser = async (req, res, next) => {
+  const token = req.cookies.refreshToken;
+
+  if (!token) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  try {
+    const decoded = verifyRefreshToken(token);
+
+    const user = {
+      id: decoded.id,
+      mobileNumber: decoded.mobileNumber,
+    };
+
+    const newAccessToken = signAccessToken(user);
+
+    res.json({
+      user,
+      accessToken: newAccessToken,
+    });
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid refresh token" });
   }
 };
 

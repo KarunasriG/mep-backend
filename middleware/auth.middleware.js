@@ -6,13 +6,15 @@ import AppError from "../utils/AppError.js";
 export const protect = async (req, res, next) => {
   try {
     const token = req.cookies.accessToken;
+    // || req.headers("Authorization")?.split(" ")[1];
     if (!token) {
       return next(new AppError("Not authenticated", 401));
     }
+    // console.log("cookies........", req.cookies);
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN);
     } catch {
       return next(new AppError("Token expired or invalid", 401));
     }
