@@ -5,35 +5,43 @@ import AppError from "../utils/AppError.js";
 
 export const protect = async (req, res, next) => {
   try {
-    // Skip authentication for OPTIONS requests (CORS preflight)
+    // console.log(
+    //   "🚀 ~ file: auth.middleware.js ~ line 4 ~ protect ~ req.method",
+    //   req.method,
+    //   req.originalUrl
+    // );
+
     if (req.method === "OPTIONS") return next();
 
-    const token = req.cookies.accessToken;
-    // || req.headers("Authorization")?.split(" ")[1];
+    const token =
+      req.cookies.accessToken || req.headers.authorization?.split(" ")[1];
+
     if (!token) {
       return next(new AppError("Not authenticated", 401));
     }
-    // console.log("cookies........", req.cookies);
 
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN);
-      req.user = decoded;
     } catch {
       return next(new AppError("Token expired or invalid", 401));
     }
 
     const user = await User.findById(decoded.id);
+
+    // console.log("DB tokenVersion:", user.tokenVersion);
+    // console.log("Token tv:", decoded.tv);
+    // console.log("Auth header:", req.headers.authorization);
+    // console.log("Cookie token exists:", !!req.cookies.accessToken);
+
     if (!user) {
       return next(new AppError("User no longer exists", 401));
     }
 
-    // PRIMARY: explicit invalidation
     if (user.tokenVersion !== decoded.tv) {
       return next(new AppError("Token invalidated", 401));
     }
 
-    // SECONDARY: password timestamp
     if (user.changedPasswordAfter(decoded.iat)) {
       return next(new AppError("Password changed after token issued", 401));
     }

@@ -2,12 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/Users.model.js";
 import AppError from "../utils/AppError.js";
-import {
-  sendTokens,
-  signAccessToken,
-  signRefreshToken,
-  verifyRefreshToken,
-} from "../utils/sendTokens.js";
+import { sendTokens, verifyRefreshToken } from "../utils/sendTokens.js";
 
 // SIGNUP
 export const signup = async (req, res, next) => {
@@ -96,7 +91,7 @@ export const login = async (req, res, next) => {
 // REFRESH ACCESS TOKEN
 export const refreshAccessToken = async (req, res, next) => {
   try {
-    console.log("REFRESH ACCESS TOKEN");
+    // console.log("REFRESH ACCESS TOKEN");
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
       return next(new AppError("No refresh token", 401));
@@ -128,7 +123,17 @@ export const refreshAccessToken = async (req, res, next) => {
 
     sendTokens(res, newAccessToken, newRefreshToken);
 
-    res.status(200).json({ status: "success" });
+    res.status(200).json({
+      status: "success",
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          role: user.role,
+        },
+        accessToken: newAccessToken,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -207,6 +212,44 @@ export const resetPassword = async (req, res, next) => {
   }
 };
 
+// CHANGE PASSWORD
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return next(
+        new AppError("Current password and new password are required", 400)
+      );
+    }
+
+    // Check if current password is correct
+    const isCorrect = await req.user.correctPassword(
+      currentPassword,
+      req.user.password
+    );
+    if (!isCorrect) {
+      return next(new AppError("Current password is incorrect", 400));
+    }
+
+    // Update password
+    req.user.password = newPassword;
+    await req.user.save(); // This will hash the password and increment tokenVersion
+
+    // Generate new tokens
+    const accessToken = req.user.signAccessToken();
+    const refreshToken = req.user.signRefreshToken();
+    sendTokens(res, accessToken, refreshToken);
+
+    res.status(200).json({
+      status: "success",
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // verify me
 
 export const verifyUser = async (req, res, next) => {
@@ -229,17 +272,10 @@ export const verifyUser = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
-    const userData = {
-      id: user._id,
-      mobileNumber: user.mobileNumber,
-      username: user.username,
-      role: user.role,
-    };
-
-    const newAccessToken = signAccessToken(userData);
+    const newAccessToken = user.signAccessToken();
 
     res.json({
-      user: userData,
+      user: user,
       accessToken: newAccessToken,
     });
   } catch (err) {
@@ -250,16 +286,34 @@ export const verifyUser = async (req, res, next) => {
 //  LOGOUT
 export const logout = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (user) {
-      user.tokenVersion += 1;
-      await user.save({ validateBeforeSave: false });
+    // req.user is set by auth middleware
+    const userId = req.user?.id;
+
+    if (userId) {
+      await User.findByIdAndUpdate(
+        userId,
+        { $inc: { tokenVersion: 1 } }, // revoke all tokens
+        { new: true }
+      );
     }
 
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    // Clear cookies properly
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
 
-    res.status(200).json({ status: "success" });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "Logged out successfully",
+    });
   } catch (err) {
     next(err);
   }
