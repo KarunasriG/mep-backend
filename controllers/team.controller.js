@@ -9,83 +9,35 @@ import TeamAudit from "../models/TeamAudit.model.js";
 
 export const createTeam = async (req, res, next) => {
   try {
-    const { teamName, bulls, teamMembers } = req.body;
+    const { teamName, bullPairs, teamMembers } = req.body;
 
-    // -------- BASIC SHAPE VALIDATION --------
+    // basic validation
     if (
       !teamName ||
-      !Array.isArray(bulls) ||
-      bulls.length === 0 ||
+      !Array.isArray(bullPairs) ||
+      bullPairs.length === 0 ||
       !Array.isArray(teamMembers) ||
       teamMembers.length === 0
     ) {
       return next(new AppError("Invalid payload structure", 400));
     }
 
-    // -------- BULL VALIDATION (FAIL FAST) --------
-    const allowedCategoryTypes = ["DENTITION", "AGE_GROUP", "CLASS"];
-
-    for (const bull of bulls) {
-      if (!bull.name || !bull.category) {
-        return next(
-          new AppError(
-            "Each bull must have a name and exactly one category",
-            400
-          )
-        );
-      }
-
-      if (
-        !bull.category.type ||
-        !bull.category.value ||
-        !allowedCategoryTypes.includes(bull.category.type)
-      ) {
-        return next(
-          new AppError("Bull category must have a valid type and value", 400)
-        );
-      }
-    }
-
-    // -------- TEAM MEMBER VALIDATION --------
-    const ownerCount = teamMembers.filter((m) => m.role === "OWNER").length;
-
-    if (ownerCount !== 1) {
-      return next(new AppError("Exactly one OWNER is required", 400));
-    }
-
-    // -------- NORMALIZATION --------
-    const normalizedBulls = bulls.map((b) => ({
-      name: b.name.trim(),
-      category: {
-        type: b.category.type,
-        value: b.category.value,
-      },
-    }));
-
-    const normalizedMembers = teamMembers.map((m) => ({
-      name: m.name.trim(),
-      role: m.role,
-      info: m.info?.trim(),
-      phone: m.phone,
-    }));
-
-    // -------- CREATE TEAM --------
+    // create team
     const team = await Team.create({
       teamName: teamName.trim(),
-      bulls: normalizedBulls,
-      teamMembers: normalizedMembers,
+      bullPairs,
+      teamMembers,
       createdBy: req.user._id,
-      status: "PENDING",
+      status: "PENDING", // force
     });
 
-    // -------- AUDIT LOG --------
+    // audit log
     await TeamAudit.create({
       team: team._id,
       action: "CREATED",
       performedBy: req.user._id,
     });
 
-    // -------- RESPONSE --------
     res.status(201).json({
       status: "success",
       data: team,
@@ -103,33 +55,78 @@ export const createTeam = async (req, res, next) => {
 
 /**
  * USER: Update Team
- * PUT /api/teams/:teamId
+ * PATCH /api/teams/:teamId
  */
-export const updateTeam = async (req, res, next) => {
+export const updateTeamRoster = async (req, res, next) => {
   try {
-    const { teamId } = req.params;
-    const { teamName, bulls, teamMembers } = req.body;
+    const { bullPairs = [], teamMembers = [] } = req.body;
 
-    const team = await Team.findById(teamId);
+    const team = await Team.findOne({
+      _id: req.params.teamId,
+      createdBy: req.user._id,
+      isActive: true,
+    });
+
     if (!team) {
       return next(new AppError("Team not found", 404));
     }
 
     // Check if user is owner
-    const owner = team.members.find(
+    const owner = team.teamMembers.find(
       (m) =>
         m.role === "OWNER" && m.userId.toString() === req.user._id.toString()
     );
     if (!owner) {
-      return next(new AppError("Only team owner can update", 403));
+      return next(new AppError("Owner missing (data corruption)", 500));
     }
 
     // Update fields
-    if (teamName) team.teamName = teamName;
-    if (bulls) team.bulls = bulls;
-    if (teamMembers) team.members = teamMembers;
+
+    // 1. Rename existing pairs
+    team.bullPairs.forEach((pair, index) => {
+      const incoming = bullPairs[index];
+      if (!incoming) return;
+
+      if (incoming.bullA?.name) pair.bullA.name = incoming.bullA.name;
+      if (incoming.bullB?.name) pair.bullB.name = incoming.bullB.name;
+      // category intentionally ignored
+    });
+
+    // 2. Add NEW pairs (if any)
+    if (bullPairs.length > team.bullPairs.length) {
+      const newPairs = bullPairs.slice(team.bullPairs.length);
+
+      newPairs.forEach((pair) => {
+        team.bullPairs.push({
+          bullA: { name: pair.bullA.name },
+          bullB: { name: pair.bullB.name },
+          category: pair.category, // allowed ONLY for new pairs
+        });
+      });
+    }
+
+    // 3. Update team members
+    const incomingNonOwners = teamMembers.filter((m) => m.role !== "OWNER");
+
+    const existingNonOwners = team.teamMembers.filter(
+      (m) => m.role !== "OWNER"
+    );
+
+    const finalMembers =
+      incomingNonOwners.length > 0 ? incomingNonOwners : existingNonOwners;
+
+    team.teamMembers = [owner, ...finalMembers];
 
     await team.save();
+
+    // Audit post-approval changes
+    if (team.status === "APPROVED") {
+      await TeamAudit.create({
+        team: team._id,
+        action: "ROSTER_UPDATED",
+        performedBy: req.user._id,
+      });
+    }
 
     res.status(200).json({
       status: "success",
@@ -338,6 +335,20 @@ export const getTeamAudit = async (req, res, next) => {
       status: "success",
       results: logs.length,
       data: logs,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getActiveTeams = async (req, res, next) => {
+  try {
+    const teams = await Team.find({ isActive: true }).lean();
+    console.log("teams", teams);
+    res.status(200).json({
+      status: "success",
+      results: teams.length,
+      data: teams,
     });
   } catch (err) {
     next(err);

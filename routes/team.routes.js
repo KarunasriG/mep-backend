@@ -2,80 +2,72 @@ import express from "express";
 import {
   createTeam,
   getMyTeams,
+  updateTeamRoster,
   getTeamById,
   deactivateTeam,
   getPendingTeams,
   decideTeam,
   getTeamAudit,
-  updateTeam,
+  getActiveTeams,
 } from "../controllers/team.controller.js";
 import { protect, restrictTo } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-/**
- * All routes below require login
- */
-router.use(protect);
-
 /* =====================================================
-   USER FLOW
+   PUBLIC ROUTES (NO AUTH)
    ===================================================== */
 
 /**
- * User creates a team → status = PENDING
+ * Get all active teams
+ * GET /api/teams/active
+ */
+router.get("/active", getActiveTeams);
+
+/* =====================================================
+   AUTHENTICATED ROUTES
+   ===================================================== */
+router.use(protect);
+
+/* ================= USER FLOW ================= */
+
+/**
+ * Create team
  * POST /api/teams
  */
 router.post("/", createTeam);
 
 /**
- * User updates their team
- * PUT /api/teams/:teamId
- */
-router.put("/:teamId", updateTeam);
-
-/**
- * User fetches their teams (pending / approved / rejected)
+ * Get my teams
  * GET /api/teams/my-teams
  */
 router.get("/my-teams", getMyTeams);
 
 /**
- * User deactivates their own team (only if NOT approved)
+ * Update team roster
+ * PATCH /api/teams/:teamId/roster
+ */
+router.patch("/:teamId/roster", updateTeamRoster);
+
+/**
+ * Deactivate own team
  * PATCH /api/teams/:teamId/deactivate
  */
 router.patch("/:teamId/deactivate", deactivateTeam);
 
-/* =====================================================
-   ADMIN FLOW
-   ===================================================== */
+/* ================= ADMIN FLOW ================= */
 
-/**
- * Admin fetches pending teams for review
- * GET /api/teams/pending
- */
 router.get("/pending", restrictTo("admin"), getPendingTeams);
 
-/**
- * Admin approves or rejects a team
- * PATCH /api/teams/:teamId/decision
- * body: { decision: "APPROVED" | "REJECTED", rejectionReason? }
- */
 router.patch("/:teamId/decision", restrictTo("admin"), decideTeam);
 
-/**
- * Admin views audit history of a team
- * GET /api/teams/:teamId/audit
- */
 router.get("/:teamId/audit", restrictTo("admin"), getTeamAudit);
 
-/* =====================================================
-   SHARED (LAST — IMPORTANT)
-   ===================================================== */
+/* ================= SHARED ================= */
 
 /**
- * Get team details (owner or admin)
- * GET /api/teams/:teamId
+ * Get team by ID (owner or admin)
+ * MUST BE LAST
  */
 router.get("/:teamId", getTeamById);
 

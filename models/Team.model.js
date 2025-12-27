@@ -13,17 +13,40 @@ const bullSchema = new mongoose.Schema(
       minlength: 2,
       maxlength: 50,
     },
+  },
+  { _id: false }
+);
+
+const categorySchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["DENTITION", "AGE_GROUP", "CLASS"],
+      required: true,
+    },
+    value: {
+      type: String,
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
+const bullPairSchema = new mongoose.Schema(
+  {
+    bullA: {
+      type: bullSchema,
+      required: true,
+    },
+
+    bullB: {
+      type: bullSchema,
+      required: true,
+    },
 
     category: {
-      type: {
-        type: String,
-        enum: ["DENTITION", "AGE_GROUP", "CLASS"],
-        required: true,
-      },
-      value: {
-        type: String,
-        required: true,
-      },
+      type: categorySchema,
+      required: true,
     },
   },
   { _id: false }
@@ -32,7 +55,12 @@ const bullSchema = new mongoose.Schema(
 /**
  * Bull category validation
  */
-bullSchema.pre("validate", function () {
+bullPairSchema.pre("validate", function () {
+  // Bulls in a pair must be different
+  if (this.bullA.name === this.bullB.name) {
+    throw new Error("Bull pair must contain two different bulls");
+  }
+
   const allowedMap = {
     DENTITION: ["MILK", "TWO", "FOUR", "SIX"],
     AGE_GROUP: ["SUB_JUNIOR", "JUNIOR", "SENIOR"],
@@ -99,16 +127,16 @@ const teamSchema = new mongoose.Schema(
       maxlength: 50,
     },
 
-    bulls: {
-      type: [bullSchema],
+    bullPairs: {
+      type: [bullPairSchema],
       validate: [
         {
           validator: (v) => Array.isArray(v) && v.length > 0,
-          message: "At least one bull is required",
+          message: "At least one bull pair is required",
         },
         {
-          validator: (v) => v.length <= 15,
-          message: "Maximum 15 bulls allowed",
+          validator: (v) => v.length <= 10,
+          message: "Maximum 10 bulls pairs allowed",
         },
       ],
     },
