@@ -2,6 +2,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/Users.model.js";
 import AppError from "../utils/AppError.js";
+import { AuthError } from "../utils/AuthError.js";
 
 export const protect = async (req, res, next) => {
   try {
@@ -14,14 +15,26 @@ export const protect = async (req, res, next) => {
     // console.log("checking Token at protect", token);
 
     if (!token) {
-      return next(new AppError("Not authenticated", 401));
+      return next(
+        new AuthError({ code: "NO_ACCESS_TOKEN", message: "Access token missing" })
+      );
     }
 
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN);
-    } catch {
-      return next(new AppError("Token expired or invalid", 401));
+    } catch (e) {
+      if (e?.name === "TokenExpiredError") {
+        return next(
+          new AuthError({ code: "TOKEN_EXPIRED", message: "Access token expired" })
+        );
+      }
+      return next(
+        new AuthError({
+          code: "INVALID_ACCESS_TOKEN",
+          message: "Invalid access token",
+        })
+      );
     }
 
     const user = await User.findById(decoded.id);
@@ -32,15 +45,24 @@ export const protect = async (req, res, next) => {
     // console.log("Cookie token exists:", !!req.cookies.accessToken);
 
     if (!user) {
-      return next(new AppError("User no longer exists", 401));
+      return next(
+        new AuthError({ code: "USER_NOT_FOUND", message: "User no longer exists" })
+      );
     }
 
     if (user.tokenVersion !== decoded.tv) {
-      return next(new AppError("Token invalidated", 401));
+      return next(
+        new AuthError({ code: "TOKEN_INVALIDATED", message: "Access token invalidated" })
+      );
     }
 
     if (user.changedPasswordAfter(decoded.iat)) {
-      return next(new AppError("Password changed after token issued", 401));
+      return next(
+        new AuthError({
+          code: "PASSWORD_CHANGED",
+          message: "Password changed after token issued",
+        })
+      );
     }
 
     req.user = user;

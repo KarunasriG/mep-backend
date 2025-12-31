@@ -43,12 +43,10 @@ export const createTeam = async (req, res, next) => {
       data: team,
     });
   } catch (err) {
-    // Duplicate team name per user
     if (err.code === 11000) {
-      return next(
-        new AppError("You already created a team with this name", 409)
-      );
+      return next(new AppError("You have already created a team", 409));
     }
+
     next(err);
   }
 };
@@ -57,10 +55,17 @@ export const createTeam = async (req, res, next) => {
  * USER: Update Team
  * PATCH /api/teams/:teamId
  */
+
 export const updateTeamRoster = async (req, res, next) => {
   try {
     const { bullPairs = [], teamMembers = [] } = req.body;
 
+    //  Basic payload sanity
+    if (!Array.isArray(bullPairs) || !Array.isArray(teamMembers)) {
+      return next(new AppError("Invalid payload structure", 400));
+    }
+
+    //  Load team (owner-only)
     const team = await Team.findOne({
       _id: req.params.teamId,
       createdBy: req.user._id,
@@ -71,55 +76,100 @@ export const updateTeamRoster = async (req, res, next) => {
       return next(new AppError("Team not found", 404));
     }
 
-    // Check if user is owner
+    //  Resolve OWNER (IMMUTABLE)
     const owner = team.teamMembers.find(
       (m) =>
-        m.role === "OWNER" && m.userId.toString() === req.user._id.toString()
+        m.role === "OWNER" &&
+        m.userId &&
+        m.userId.toString() === req.user._id.toString()
     );
+
     if (!owner) {
       return next(new AppError("Owner missing (data corruption)", 500));
     }
 
-    // Update fields
-
-    // 1. Rename existing pairs
-    team.bullPairs.forEach((pair, index) => {
-      const incoming = bullPairs[index];
-      if (!incoming) return;
-
-      if (incoming.bullA?.name) pair.bullA.name = incoming.bullA.name;
-      if (incoming.bullB?.name) pair.bullB.name = incoming.bullB.name;
-      // category intentionally ignored
-    });
-
-    // 2. Add NEW pairs (if any)
-    if (bullPairs.length > team.bullPairs.length) {
-      const newPairs = bullPairs.slice(team.bullPairs.length);
-
-      newPairs.forEach((pair) => {
-        team.bullPairs.push({
-          bullA: { name: pair.bullA.name },
-          bullB: { name: pair.bullB.name },
-          category: pair.category, // allowed ONLY for new pairs
-        });
-      });
-    }
-
-    // 3. Update team members
-    const incomingNonOwners = teamMembers.filter((m) => m.role !== "OWNER");
-
-    const existingNonOwners = team.teamMembers.filter(
-      (m) => m.role !== "OWNER"
+    //  Validate ObjectIds
+    const invalidBullId = bullPairs.some(
+      (b) => b._id && !mongoose.Types.ObjectId.isValid(b._id)
     );
 
-    const finalMembers =
-      incomingNonOwners.length > 0 ? incomingNonOwners : existingNonOwners;
+    const invalidMemberId = teamMembers.some(
+      (m) => m._id && !mongoose.Types.ObjectId.isValid(m._id)
+    );
 
-    team.teamMembers = [owner, ...finalMembers];
+    if (invalidBullId || invalidMemberId) {
+      return next(new AppError("Invalid ID format in payload", 400));
+    }
 
+    //  Update EXISTING bull pairs
+    bullPairs.forEach((incoming) => {
+      if (!incoming._id) return;
+
+      const existing = team.bullPairs.id(incoming._id);
+      if (!existing) return;
+
+      if (incoming.bullA?.name) {
+        existing.bullA.name = incoming.bullA.name;
+      }
+
+      if (incoming.bullB?.name) {
+        existing.bullB.name = incoming.bullB.name;
+      }
+
+      // category is intentionally immutable for existing pairs
+    });
+
+    //  Add NEW bull pairs
+    const existingBullIds = team.bullPairs.map((bp) => bp._id.toString());
+
+    const newPairs = bullPairs.filter(
+      (p) => !p._id || !existingBullIds.includes(p._id.toString())
+    );
+
+    newPairs.forEach((pair) => {
+      team.bullPairs.push({
+        bullA: { name: pair.bullA.name },
+        bullB: { name: pair.bullB.name },
+        category: pair.category,
+      });
+    });
+
+    //  Update team members (FULL REPLACE, EXPLICIT)
+    if (teamMembers.length === 0) {
+      return next(new AppError("Team must contain at least one member", 400));
+    }
+
+    const updatedMembers = [];
+
+    teamMembers.forEach((incoming) => {
+      // OWNER is immutable — skip silently
+      if (incoming.role === "OWNER") return;
+
+      if (!incoming._id) return;
+
+      const existing = team.teamMembers.id(incoming._id);
+      if (!existing) return;
+
+      existing.name = incoming.name;
+      existing.role = incoming.role;
+      existing.info = incoming.info;
+      existing.phone = incoming.phone;
+
+      updatedMembers.push(existing);
+    });
+
+    // Re-attach OWNER (always first)
+    team.teamMembers = [
+      owner,
+      ...updatedMembers.filter(
+        (m) => m._id.toString() !== owner._id.toString()
+      ),
+    ];
+
+    //  Persist
     await team.save();
 
-    // Audit post-approval changes
+    //  Audit (approved teams only)
     if (team.status === "APPROVED") {
       await TeamAudit.create({
         team: team._id,
@@ -304,7 +354,7 @@ export const getMyTeam = async (req, res, next) => {
     const team = await Team.findOne({
       isActive: true,
       status: "APPROVED",
-      "teamMembers.userId": req.user._id,
+      createdBy: req.user._id,
     }).lean();
 
     if (!team) {

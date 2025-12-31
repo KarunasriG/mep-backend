@@ -2,6 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/Users.model.js";
 import AppError from "../utils/AppError.js";
+import { AuthError } from "../utils/AuthError.js";
 import { sendTokens, verifyRefreshToken } from "../utils/sendTokens.js";
 
 // SIGNUP
@@ -95,24 +96,36 @@ export const refreshAccessToken = async (req, res, next) => {
     // console.log(req.cookies.refreshToken);
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
-      return next(new AppError("No refresh token", 401));
+      return next(
+        new AuthError({
+          code: "NO_REFRESH_TOKEN",
+        })
+      );
     }
 
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN);
     } catch (err) {
-      return next(new AppError("Invalid or expired refresh token", 401));
+      return next(
+        new AuthError({
+          code: "INVALID_REFRESH_TOKEN",
+        })
+      );
     }
 
     const user = await User.findById(decoded.id);
     if (!user) {
-      return next(new AppError("User no longer exists", 401));
+      return next(
+        new AuthError({
+          code: "USER_NOT_FOUND",
+        })
+      );
     }
 
     // CRITICAL: invalidate old refresh tokens
     if (user.tokenVersion !== decoded.tv) {
-      return next(new AppError("Refresh token invalidated", 401));
+      return next(new AuthError({ code: "TOKEN_REVOKED" }));
     }
 
     // Rotate refresh token properly
@@ -125,6 +138,7 @@ export const refreshAccessToken = async (req, res, next) => {
     sendTokens(res, newAccessToken, newRefreshToken);
 
     res.status(200).json({
+      ok: true,
       status: "success",
       data: {
         user: {
@@ -132,7 +146,6 @@ export const refreshAccessToken = async (req, res, next) => {
           username: user.username,
           role: user.role,
         },
-        accessToken: newAccessToken,
       },
     });
   } catch (err) {

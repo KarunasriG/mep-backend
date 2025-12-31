@@ -32,25 +32,27 @@ const categorySchema = new mongoose.Schema(
   { _id: false }
 );
 
-const bullPairSchema = new mongoose.Schema(
-  {
-    bullA: {
-      type: bullSchema,
-      required: true,
-    },
-
-    bullB: {
-      type: bullSchema,
-      required: true,
-    },
-
-    category: {
-      type: categorySchema,
-      required: true,
-    },
+const bullPairSchema = new mongoose.Schema({
+  _id: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: () => new mongoose.Types.ObjectId(),
   },
-  { _id: false }
-);
+
+  bullA: {
+    type: bullSchema,
+    required: true,
+  },
+
+  bullB: {
+    type: bullSchema,
+    required: true,
+  },
+
+  category: {
+    type: categorySchema,
+    required: true,
+  },
+});
 
 /**
  * Bull category validation
@@ -79,40 +81,41 @@ bullPairSchema.pre("validate", function () {
 /**
  * Embedded Team Member Schema
  */
-const teamMemberSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-      minlength: 2,
-      maxlength: 50,
-    },
-
-    role: {
-      type: String,
-      enum: ["OWNER", "CAPTAIN", "DRIVER", "TRAINER", "HELPER"],
-      default: "HELPER",
-    },
-
-    info: {
-      type: String,
-      trim: true,
-      maxlength: 200,
-    },
-
-    phone: {
-      type: String,
-      match: /^[6-9]\d{9}$/,
-    },
+const teamMemberSchema = new mongoose.Schema({
+  _id: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: () => new mongoose.Types.ObjectId(),
   },
-  { _id: false }
-);
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 2,
+    maxlength: 50,
+  },
+
+  role: {
+    type: String,
+    enum: ["OWNER", "CAPTAIN", "DRIVER", "TRAINER", "HELPER"],
+    default: "HELPER",
+  },
+
+  info: {
+    type: String,
+    trim: true,
+    maxlength: 200,
+  },
+
+  phone: {
+    type: String,
+    match: /^[6-9]\d{9}$/,
+  },
+});
 
 /**
  * Team Schema
@@ -195,7 +198,7 @@ const teamSchema = new mongoose.Schema(
 /**
  * Prevent duplicate team names per user
  */
-teamSchema.index({ teamName: 1, createdBy: 1 }, { unique: true });
+teamSchema.index({ createdBy: 1 }, { unique: true });
 
 /**
  * Cross-field & lifecycle invariants (THROW-BASED)
