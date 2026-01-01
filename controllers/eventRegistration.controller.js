@@ -15,7 +15,6 @@ export const registerForEvent = async (req, res, next) => {
       });
     }
 
-    console.log("RAW bullPairs from req:", bullPairs);
     bullPairs.forEach((bp, i) => {
       console.log(i, bp, typeof bp);
     });
@@ -61,12 +60,10 @@ export const registerForEvent = async (req, res, next) => {
     }
 
     // Validate bullPairs belong to team
-    console.log("team.bullPairs", team.bullPairs);
     const teamBullIds = team.bullPairs.map((bp) => bp._id.toString());
     console.log("teamBullIds", teamBullIds);
 
     const invalidBull = bullPairs.some((id) => !teamBullIds.includes(id));
-    console.log("invalidBull", invalidBull);
 
     if (invalidBull) {
       return res.status(400).json({

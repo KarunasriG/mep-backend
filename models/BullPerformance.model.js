@@ -1,4 +1,3 @@
-// models/BullPerformance.js
 import mongoose from "mongoose";
 
 const bullPerformanceSchema = new mongoose.Schema(
@@ -8,41 +7,30 @@ const bullPerformanceSchema = new mongoose.Schema(
       ref: "Event",
       required: true,
     },
-
     team: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
       required: true,
     },
-
-    bullPair: {
+bullPair: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "BullPair",
       required: true,
     },
-
-    distancePulledMeters: {
+    distanceCovered: {
       type: Number,
       required: true,
       min: 0,
     },
-
-    rockWeightKg: {
+    timeTaken: {
       type: Number,
       required: true,
       min: 0,
     },
-
-    timeTakenMinutes: {
+    rockWeight: {
       type: Number,
       required: true,
       min: 0,
-    },
-
-    recordedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // admin
-      required: true,
     },
   },
   { timestamps: true }

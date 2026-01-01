@@ -1,7 +1,6 @@
 // routes/adminEventRegistration.routes.js
 import express from "express";
-import { protect } from "../middleware/auth.middleware.js";
-import { isAdmin } from "../middleware/isAdmin.middleware.js";
+import { protect, restrictTo } from "../middleware/auth.middleware.js";
 import {
   getRegistrationsByEvent,
   updateRegistrationStatus,
@@ -9,10 +8,10 @@ import {
 
 const router = express.Router();
 
-router.use(protect, isAdmin);
+router.use(protect, restrictTo("admin"));
 
-router.get("/events/:eventId/registrations", getRegistrationsByEvent);
+router.get("/", getRegistrationsByEvent);
 
-router.patch("/registrations/:registrationId/status", updateRegistrationStatus);
+router.patch("/:registrationId", updateRegistrationStatus);
 
 export default router;

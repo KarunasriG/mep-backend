@@ -7,4 +7,6 @@ const router = express.Router();
 // public
 router.post("/:eventId/register", protect, registerForEvent);
 
+// router.get("/admin/registrations?status=Pending", getRegistrationsByStatus);
+
 export default router;

@@ -2,11 +2,20 @@ import EventRegistration from "../models/EventRegistration.model.js";
 
 export const getRegistrationsByEvent = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
+    const { eventId } = req.query;
+
+    console.log("eventId", eventId);
+
+    if (!eventId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Event ID is required",
+      });
+    }
 
     const registrations = await EventRegistration.find({ event: eventId })
       .populate("team", "teamName")
-      .populate("registeredBy", "username")
+      .populate("registeredBy", "username mobileNumber")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -22,6 +31,8 @@ export const updateRegistrationStatus = async (req, res, next) => {
   try {
     const { registrationId } = req.params;
     const { status, reason } = req.body;
+
+    console.log("status", status, "reason", reason);
 
     if (!["APPROVED", "REJECTED"].includes(status)) {
       return res.status(400).json({
@@ -53,7 +64,16 @@ export const updateRegistrationStatus = async (req, res, next) => {
     }
 
     registration.status = status;
-    registration.rejectionReason = status === "REJECTED" ? reason : undefined;
+
+    if (status === "APPROVED") {
+      registration.approvedBy = req.user._id;
+      registration.approvedAt = new Date();
+    }
+
+    if (reason) {
+      registration.adminNotes = reason;
+    }
+
     await registration.save();
 
     res.status(200).json({
