@@ -11,6 +11,7 @@ import BullPerformance from "../models/BullPerformance.model.js";
 export const getApprovedTeams = async (req, res, next) => {
   try {
     const { eventId } = req.params;
+    console.log("eventId", eventId);
 
     // 1. Get all approved registrations sorted by creation time
     const registrations = await EventRegistration.find({
@@ -77,13 +78,16 @@ export const recordTeamPerformance = async (req, res, next) => {
     // 1. Validate Event Status
     const event = await Event.findById(eventId);
     if (!event) {
-      return res.status(404).json({ status: "fail", message: "Event not found" });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Event not found" });
     }
     // Allow performance recording if event is ONGOING (LIVE)
     if (event.state !== "ONGOING") {
       return res.status(400).json({
         status: "fail",
-        message: "Performance can only be recorded when event is LIVE (ONGOING)",
+        message:
+          "Performance can only be recorded when event is LIVE (ONGOING)",
       });
     }
 
@@ -148,7 +152,8 @@ export const recordTeamPerformance = async (req, res, next) => {
 export const recordBullPerformance = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const { teamId, bullName, distanceCovered, timeTaken, rockWeight } = req.body;
+    const { teamId, bullName, distanceCovered, timeTaken, rockWeight } =
+      req.body;
 
     const performance = await BullPerformance.create({
       event: eventId,

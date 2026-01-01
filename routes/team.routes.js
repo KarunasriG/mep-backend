@@ -9,14 +9,13 @@ import {
   decideTeam,
   getTeamAudit,
   getActiveTeams,
+  getTeamsByStatus,
 } from "../controllers/team.controller.js";
 import { protect, restrictTo } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-/* =====================================================
-   PUBLIC ROUTES (NO AUTH)
-   ===================================================== */
+// PUBLIC ROUTES (NO AUTH)
 
 /**
  * Get all active teams
@@ -24,9 +23,7 @@ const router = express.Router();
  */
 router.get("/active", getActiveTeams);
 
-/* =====================================================
-   AUTHENTICATED ROUTES
-   ===================================================== */
+// AUTHENTICATED ROUTES
 router.use(protect);
 
 /* ================= USER FLOW ================= */
@@ -60,6 +57,8 @@ router.patch("/:teamId/deactivate", deactivateTeam);
 router.get("/pending", restrictTo("admin"), getPendingTeams);
 
 router.patch("/:teamId/decision", restrictTo("admin"), decideTeam);
+
+router.get("/teams/:status", restrictTo("admin"), getTeamsByStatus);
 
 router.get("/:teamId/audit", restrictTo("admin"), getTeamAudit);
 

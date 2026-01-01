@@ -201,6 +201,7 @@ export const getAllPublicEvents = async (req, res, next) => {
 export const getEventById = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
+    console.log("Event in back", event);
 
     if (!event) {
       return res.status(404).json({
@@ -210,12 +211,12 @@ export const getEventById = async (req, res, next) => {
     }
 
     // hide future internal events from public
-    if (event.state === "UPCOMING") {
-      return res.status(403).json({
-        status: "fail",
-        message: "Event not available",
-      });
-    }
+    // if (event.state === "UPCOMING") {
+    //   return res.status(403).json({
+    //     status: "fail",
+    //     message: "Event not available",
+    //   });
+    // }
 
     res.status(200).json({
       status: "success",

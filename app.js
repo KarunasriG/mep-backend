@@ -50,6 +50,7 @@ app.use("/api/admin/events", eventRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/events", eventRegistraionRoutes);
 app.use("/api/admin/registrations", adminRegistrationRoutes);
+app.use("/api/performance", performanceRoutes);
 
 // global error handler - must be after routes
 app.use(globalErrorHandler);

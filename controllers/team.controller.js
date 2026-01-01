@@ -402,7 +402,26 @@ export const getActiveTeams = async (req, res, next) => {
     // console.log("teams", teams);
     res.status(200).json({
       status: "success",
-      results: teams.length,
+      data: teams,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getTeamsByStatus = async (req, res, next) => {
+  try {
+    const { status } = req.params;
+    const filter = {};
+    if (status && status !== "all") {
+      filter.status = status.toUpperCase(); // DB stores enum
+    }
+    const teams = await Team.find({ filter })
+      .populate("createdBy", "name")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      status: "success",
       data: teams,
     });
   } catch (err) {
